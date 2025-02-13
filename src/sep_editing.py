@@ -133,7 +133,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
 
             wav_sample = processor.inverse_mel_with_phase(mel_sample, mixed_stft_c)
             wav_sample = wav_sample.squeeze()
-            sf.write(f'./test/sampling/edited{batch}.wav', wav_sample, 16000)
+            sf.write(f'./test/sampling/edited_{text}_{strength}_{iter}_{batch}.wav', wav_sample, 16000)
 
         # mel_tar = torch.stack(mel_tar_samples).mean(dim=0)  # 평균 계산
         mel_tar = torch.cat(mel_tar_samples, dim=0)
@@ -187,32 +187,32 @@ def inference(audioldm, processor, target_path, mixed_path, config):
                 
         # ------------------------------------------------------------------ #
 
-        plt.plot(loss_values)
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Loss Trend')
-        plt.savefig(f'./test/plot/loss{text}_{iter}.png')
-        plt.close()
+        # plt.plot(loss_values)
+        # plt.xlabel('Epoch')
+        # plt.ylabel('Loss')
+        # plt.title('Loss Trend')
+        # plt.savefig(f'./test/plot/loss_{text}_{iter}.png')
+        # plt.close()
 
         plt.plot(sisdrs_list)
         plt.xlabel('Epoch')
         plt.ylabel('sisdr')
         plt.title('sisdr Trend')
-        plt.savefig(f'./test/plot/sisdr{text}_{iter}.png')
+        plt.savefig(f'./test/plot/sisdr_{text}_{iter}.png')
         plt.close()
 
         plt.plot(sdris_list)
         plt.xlabel('Epoch')
         plt.ylabel('sdri')
         plt.title('sdri Trend')
-        plt.savefig(f'./test/plot/sdri{text}_{iter}.png')
+        plt.savefig(f'./test/plot/sdri_{text}_{iter}.png')
         plt.close()
 
         wav_sep = processor.inverse_stft(masked_stft, mixed_stft_c)
         wav_sep = wav_sep.squeeze()
-        sf.write(f'./test/sep{text}_{iter}.wav', wav_sep, 16000)
+        sf.write(f'./test/sep_{text}_{iter}.wav', wav_sep, 16000)
 
-        mixed_path = f'./test/sep{text}_{iter}.wav'
+        mixed_path = f'./test/sep_{text}_{iter}.wav'
         print(f"iteration: {iter} // sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
 
     print(f"Final: sample: {text}\nFFF sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
