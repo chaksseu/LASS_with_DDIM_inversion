@@ -116,7 +116,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         mixed_mel = processor.wav_to_mel(mixed_wav_)
 
         mel_tar_samples = []
-        for batch in tqdm(range(batchsize)):
+        for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
             mel_sample = audioldm.edit_audio_with_ddim(
                                 mel=mixed_mel,
                                 text=text,
@@ -131,9 +131,10 @@ def inference(audioldm, processor, target_path, mixed_path, config):
             
             mel_tar_samples.append(mel_sample) # [30, 1, 1024, 512]
 
-            wav_sample = processor.inverse_mel_with_phase(mel_sample, mixed_stft_c)
-            wav_sample = wav_sample.squeeze()
-            sf.write(f'./test/sampling/edited_{text}_{strength}_{iter}_{batch}.wav', wav_sample, 16000)
+            if batch % 10 == 0:
+                wav_sample = processor.inverse_mel_with_phase(mel_sample, mixed_stft_c)
+                wav_sample = wav_sample.squeeze()
+                sf.write(f'./test/sampling/edited_{text}_{strength:.4f}_{iter}_{batch}.wav', wav_sample, 16000)
 
         # mel_tar = torch.stack(mel_tar_samples).mean(dim=0)  # 평균 계산
         mel_tar = torch.cat(mel_tar_samples, dim=0)
@@ -215,7 +216,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         mixed_path = f'./test/sep_{text}_{iter}.wav'
         print(f"iteration: {iter} // sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
 
-    print(f"Final: sample: {text}\nFFF sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
+    print(f"Final: sample: {text}\-> sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
     return sisdrs_list[-1], sdris_list[-1]
 
 
