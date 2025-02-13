@@ -175,7 +175,7 @@ if __name__ == "__main__":
             'strength': 0.1*i,
             'learning_rate': 0.01,
             'iteration': 1,
-            'samples': 2  # number of samples to evaluate
+            'samples': 100  # number of samples to evaluate
         }
 
         mean_sisdr, mean_sdri = eval((processor, audioldm), config)
@@ -184,7 +184,7 @@ if __name__ == "__main__":
         strength_ = config['strength']
         for epoch, (mean_sisdr, mean_sdri) in enumerate(zip(mean_sisdr, mean_sdri)):
             if (epoch+1) % 100:
-                print(f">> {strength_},{epoch}::{mean_sisdr:.4f} / {mean_sdri:.4f}")
+                print(f">> {strength_},{epoch+1}::{mean_sisdr:.4f} / {mean_sdri:.4f}")
 
 
 
