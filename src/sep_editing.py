@@ -107,7 +107,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         mixed_wav = processor.read_wav_file(mixed_path)
 
         sisdr = calculate_sisdr(ref=target_wav, est=mixed_wav)
-        print(sisdr)
+        # print(sisdr)
 
         # ------------------------------------------------------------------ #
 
@@ -115,29 +115,24 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         mixed_stft, mixed_stft_c = processor.wav_to_stft(mixed_wav_)
         mixed_mel = processor.wav_to_mel(mixed_wav_)
 
-        mel_tar_samples = []
-        for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
-            mel_sample = audioldm.edit_audio_with_ddim(
-                                mel=mixed_mel,
-                                text=text,
-                                duration=10.24,
-                                batch_size=1,
-                                transfer_strength=strength,
-                                guidance_scale=2.5,
-                                ddim_steps=50,
-                                clipping = False,
-                                return_type="mel",
-                            )
+        mixed_mels = mixed_mel.repeat(batchsize, 1, 1, 1)
+        # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
+        mel_samples = audioldm.edit_audio_with_ddim(
+                            mel=mixed_mels,
+                            text=text,
+                            duration=10.24,
+                            batch_size=batchsize,
+                            transfer_strength=strength,
+                            guidance_scale=2.5,
+                            ddim_steps=50,
+                            clipping = False,
+                            return_type="mel",
+                        )
             
-            mel_tar_samples.append(mel_sample) # [30, 1, 1024, 512]
-
-            if batch % 10 == 0:
-                wav_sample = processor.inverse_mel_with_phase(mel_sample, mixed_stft_c)
-                wav_sample = wav_sample.squeeze()
-                sf.write(f'./test/sampling/edited_{text}_{strength:.4f}_{iter}_{batch}.wav', wav_sample, 16000)
-
-        # mel_tar = torch.stack(mel_tar_samples).mean(dim=0)  # 평균 계산
-        mel_tar = torch.cat(mel_tar_samples, dim=0)
+        batch_num = 0
+        wav_sample = processor.inverse_mel_with_phase(mel_samples[batch_num:batch_num+1], mixed_stft_c)
+        wav_sample = wav_sample.squeeze()
+        sf.write(f'./test/sampling/edited_{text}_{strength:.4f}_{iter}_{batch_num}.wav', wav_sample, 16000)
 
         # ------------------------------------------------------------------ #
 
@@ -156,7 +151,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
             masked_mel = processor.masked_stft_to_masked_mel(masked_stft)  # [1,1,1024,512]
             masked_mel_expended = masked_mel.repeat(batchsize, 1, 1, 1)
 
-            loss = criterion(mel_tar, masked_mel_expended)  # 손실 계산
+            loss = criterion(mel_samples, masked_mel_expended)  # 손실 계산
 
             loss.backward()  # 역전파
             optimizer.step()  # 가중치 업데이트
@@ -182,9 +177,10 @@ def inference(audioldm, processor, target_path, mixed_path, config):
             mixed_wav = np.expand_dims(mixed_wav, axis=0)
             ##
 
-            # if epoch % 1000 == 0:
-            #     print(f"Epoch [{epoch}/{num_epochs}], Loss: {loss.item():.4f}")
-            #     print(f"sisdr: {sisdr:.4f}, sdri: {sdri:.4f}")
+            # if (epoch+1) % 100 == 0:
+            # #     print(f"Epoch [{epoch}/{num_epochs}], Loss: {loss.item():.4f}")
+            #     iter_sisdrs.append(sisdrs_list[-1])
+            #     iter_sdris.append(sdris_list[-1]_
                 
         # ------------------------------------------------------------------ #
 
@@ -214,10 +210,10 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         sf.write(f'./test/sep_{text}_{iter}.wav', wav_sep, 16000)
 
         mixed_path = f'./test/sep_{text}_{iter}.wav'
-        print(f"iteration: {iter} // sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
+        # print(f"iteration: {iter} // sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
 
-    print(f"Final: sample: {text}\-> sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
-    return sisdrs_list[-1], sdris_list[-1]
+    # print(f"Final: sample: {text}\-> sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
+    return sisdrs_list, sdris_list
 
 
 if __name__ == "__main__":

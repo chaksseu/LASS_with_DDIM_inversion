@@ -141,12 +141,12 @@ class AudioLDM(nn.Module):
                 return_format[key_] = batch[key_]
         return return_format[key]
     
-    def encode_prompt(self, prompts: Union[str, List[str]], do_cfg=True):  # -> [2*B,512]
-        # 1. Batch size 결정
-        if prompts is not None and isinstance(prompts, str):
-            batch_size = 1
-        elif prompts is not None and isinstance(prompts, list):
-            batch_size = len(prompts)
+    def encode_prompt(self, prompts: Union[str, List[str]], batch_size: int, do_cfg=True):  # -> [2*B,512]
+        # 1. Batch size 적용
+        if isinstance(prompts, str):
+            prompts = [prompts] * batch_size  # 단일 문자열이면 batch_size만큼 반복
+        elif isinstance(prompts, list) and len(prompts) == 1:
+            prompts = prompts * batch_size  # 리스트에 하나만 있으면 batch_size만큼 반복
         else:
             raise ValueError(f"Invalid prompts: {prompts}")
         
@@ -347,7 +347,7 @@ class AudioLDM(nn.Module):
             init_latent_x = torch.clamp(init_latent_x, min=-10.0, max=10.0)  # clipping
 
         # ========== DDIM Inversion (noising) ==========
-        prompt_embeds = self.encode_prompt(prompts=text, do_cfg=True)
+        prompt_embeds = self.encode_prompt(prompts=text, batch_size=batch_size, do_cfg=True)
         uncond_embeds, cond_embeds = prompt_embeds.chunk(2)
 
         # t_enc step으로 ddim noising

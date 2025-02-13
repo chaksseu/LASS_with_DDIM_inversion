@@ -130,16 +130,24 @@ class AudioCapsEvaluator:
             
             config['text'] = text[0]
 
-            sisdr, sdri = inference(audioldm, processor,
+            sisdr_li, sdri_li = inference(audioldm, processor,
                       target_path=source_path,
                       mixed_path=mixture_path,
                       config=config)
 
-            sisdrs_list.append(sisdr)
-            sdris_list.append(sdri)
+            sisdrs_list.append(sisdr_li)
+            sdris_list.append(sdri_li)
+            
+        sisdrs_array = np.array(sisdrs_list)  # (samples, iterations)
+        sdris_array = np.array(sdris_list)    # (samples, iterations)
+        print(sisdrs_array.shape, sdris_array.shape)
 
-        mean_sisdr = np.mean(sisdrs_list)
-        mean_sdri = np.mean(sdris_list)
+        # 각 iteration 별 평균을 계산 (samples에 대해 평균을 구함)
+        mean_sisdr = np.mean(sisdrs_array, axis=0)  # (iterations,)
+        mean_sdri = np.mean(sdris_array, axis=0)
+
+        # mean_sisdr = np.mean(sisdrs_list)
+        # mean_sdri = np.mean(sdris_list)
         
         return mean_sisdr, mean_sdri
 
@@ -160,20 +168,23 @@ if __name__ == "__main__":
     device = audioldm.device
     processor = prcssr(device=device)
 
-    for i in range(3, 11):
+    for i in range(1, 6):
         config = {
             'num_epochs': 1000,
-            'batchsize': 30,
+            'batchsize': 32,
             'strength': 0.1*i,
             'learning_rate': 0.01,
-            'iteration': 5,
-            'samples': 10
+            'iteration': 1,
+            'samples': 2  # number of samples to evaluate
         }
 
         mean_sisdr, mean_sdri = eval((processor, audioldm), config)
         
-        print(" SI-SDR  |  SDRi ")
-        print(f">>>>>>>>>>>>>>  {round(mean_sisdr, 2)}  |  {round(mean_sdri, 2)}")
+        print("========== SI-SDR  |  SDRi ===========")
+        strength_ = config['strength']
+        for epoch, (mean_sisdr, mean_sdri) in enumerate(zip(mean_sisdr, mean_sdri)):
+            if (epoch+1) % 100:
+                print(f">> {strength_},{epoch}::{mean_sisdr[epoch]:.4f} / {mean_sdri[epoch]:.4f}")
 
 
 
