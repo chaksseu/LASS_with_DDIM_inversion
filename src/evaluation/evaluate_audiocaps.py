@@ -164,7 +164,7 @@ if __name__ == "__main__":
 
     eval = AudioCapsEvaluator(query='caption', sampling_rate=16000)
     
-    audioldm = ldm('cuda:0')
+    audioldm = ldm('cuda')
     device = audioldm.device
     processor = prcssr(device=device)
 
@@ -184,7 +184,7 @@ if __name__ == "__main__":
         strength_ = config['strength']
         for epoch, (mean_sisdr, mean_sdri) in enumerate(zip(mean_sisdr, mean_sdri)):
             if (epoch+1) % 100:
-                print(f">> {strength_},{epoch}::{mean_sisdr[epoch]:.4f} / {mean_sdri[epoch]:.4f}")
+                print(f">> {strength_},{epoch}::{mean_sisdr:.4f} / {mean_sdri:.4f}")
 
 
 
