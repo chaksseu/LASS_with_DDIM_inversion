@@ -101,6 +101,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
     strength = config['strength']
     iteration = config['iteration']
     text = config['text']
+    steps = config['steps']
 
     for iter in range(iteration):
         target_wav = processor.read_wav_file(target_path)
@@ -124,7 +125,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
                             batch_size=batchsize,
                             transfer_strength=strength,
                             guidance_scale=2.5,
-                            ddim_steps=50,
+                            ddim_steps=steps,
                             clipping = False,
                             return_type="mel",
                         )

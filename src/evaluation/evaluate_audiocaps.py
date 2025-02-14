@@ -140,7 +140,7 @@ class AudioCapsEvaluator:
             
         sisdrs_array = np.array(sisdrs_list)  # (samples, iterations)
         sdris_array = np.array(sdris_list)    # (samples, iterations)
-        print(sisdrs_array.shape, sdris_array.shape)
+        # print(sisdrs_array.shape, sdris_array.shape)
 
         # 각 iteration 별 평균을 계산 (samples에 대해 평균을 구함)
         mean_sisdr = np.mean(sisdrs_array, axis=0)  # (iterations,)
@@ -168,14 +168,15 @@ if __name__ == "__main__":
     device = audioldm.device
     processor = prcssr(device=device)
 
-    for i in range(1, 6):
+    for i in range(4, 6):
         config = {
             'num_epochs': 1000,
             'batchsize': 32,
             'strength': 0.1*i,
             'learning_rate': 0.01,
             'iteration': 1,
-            'samples': 100  # number of samples to evaluate
+            'samples': 100,  # number of samples to evaluate
+            'steps': 25,  # 50 
         }
 
         mean_sisdr, mean_sdri = eval((processor, audioldm), config)
@@ -183,7 +184,7 @@ if __name__ == "__main__":
         print("========== SI-SDR  |  SDRi ===========")
         strength_ = config['strength']
         for epoch, (mean_sisdr, mean_sdri) in enumerate(zip(mean_sisdr, mean_sdri)):
-            if (epoch+1) % 100:
+            if not ((epoch+1) % 100):
                 print(f">> {strength_},{epoch+1}::{mean_sisdr:.4f} / {mean_sdri:.4f}")
 
 
