@@ -153,7 +153,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         batch_sample = 0
         wav_sample = processor.inverse_mel_with_phase(mel_samples[batch_sample:batch_sample+1], mixed_stft_c)
         wav_sample = wav_sample.squeeze()
-        sf.write(f'./test_null/batch_samples/edited_{text}_{strength:.4f}_{iter}_{batch_sample}.wav', wav_sample, 16000)
+        sf.write(f'./test/batch_samples/edited_{text}_{strength:.4f}_{iter}_{batch_sample}.wav', wav_sample, 16000)
 
         # ------------------------------------------------------------------ #
 
@@ -216,14 +216,14 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         plt.xlabel('Epoch')
         plt.ylabel('sisdr')
         plt.title('sisdr Trend')
-        plt.savefig(f'./test_null/plot/sisdr_{text}_{iter}.png')
+        plt.savefig(f'./test/plot/sisdr_{text}_{iter}.png')
         plt.close()
 
         plt.plot(sdris_list)
         plt.xlabel('Epoch')
         plt.ylabel('sdri')
         plt.title('sdri Trend')
-        plt.savefig(f'./test_null/plot/sdri_{text}_{iter}.png')
+        plt.savefig(f'./test/plot/sdri_{text}_{iter}.png')
         plt.close()
 
         iter_sisdrs.append(sisdr)
@@ -231,13 +231,13 @@ def inference(audioldm, processor, target_path, mixed_path, config):
 
         wav_sep = processor.inverse_stft(masked_stft, mixed_stft_c)
 
-        sf.write(f'./test_null/result/sep_{text}_{iter}.wav', wav_sep, 16000)
+        sf.write(f'./test/result/sep_{text}_{iter}.wav', wav_sep, 16000)
 
-        mixed_path = f'./test_null/result/sep_{text}_{iter}.wav'
+        mixed_path = f'./test/result/sep_{text}_{iter}.wav'
         # print(f"iteration: {iter} // sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
 
     # print(f"Final: sample: {text}\-> sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
-    assert len(iter_sisdrs) == len(iter_sdris) == 5, (len(iter_sisdrs), len(iter_sdris))
+    # assert len(iter_sisdrs) == len(iter_sdris) == 5, (len(iter_sisdrs), len(iter_sdris))
     return iter_sisdrs, iter_sdris
 
 

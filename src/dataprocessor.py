@@ -5,7 +5,7 @@ import torchaudio
 from librosa.filters import mel as librosa_mel_fn
 
 class AudioDataProcessor():
-    def __init__(self, device="cuda"):
+    def __init__(self, device="cuda", config=None):
         self.device = device
 
         self.norm_shifting = 0
@@ -16,7 +16,7 @@ class AudioDataProcessor():
         self.do_random_segment = False
 
         self.sampling_rate = 16000
-        self.duration = 10.24
+        self.duration = config.get('duration', 10.24) if config else 10.24
         self.target_length = 1024
         self.mixup = 0.0
 

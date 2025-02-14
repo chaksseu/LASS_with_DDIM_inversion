@@ -92,7 +92,7 @@ schedular_config = """
 
 class AudioLDM(nn.Module):
     
-    def __init__(self, device='cuda', repo_id="cvssp/audioldm"):
+    def __init__(self, device='cuda', repo_id="cvssp/audioldm", config=None):
         super().__init__()
         self.device = torch.device(device)
         pipe = AudioLDMPipeline.from_pretrained(repo_id, use_safetensors=False)
@@ -117,7 +117,7 @@ class AudioLDM(nn.Module):
 
         self.evalmode = True
         self.checkpoint_path = repo_id
-        self.audio_duration = 10.24
+        self.audio_duration = 10.24 if not config else config['duration']
         self.original_waveform_length = int(self.audio_duration * self.vocoder.config.sampling_rate)  # 10.24 * 16000 = 163840
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)  # 4
         print(f'[INFO] audioldm.py: loaded AudioLDM!')
