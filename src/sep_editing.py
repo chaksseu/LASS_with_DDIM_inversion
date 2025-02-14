@@ -102,7 +102,13 @@ def inference(audioldm, processor, target_path, mixed_path, config):
     iteration = config['iteration']
     text = config['text']
     steps = config['steps']
+    mixed_text = config['mixed_text']
+    mixed_text = ""
 
+
+    iter_sisdrs = []
+    iter_sdris = []
+    
     for iter in range(iteration):
         target_wav = processor.read_wav_file(target_path)
         mixed_wav = processor.read_wav_file(mixed_path)
@@ -118,28 +124,42 @@ def inference(audioldm, processor, target_path, mixed_path, config):
 
         mixed_mels = mixed_mel.repeat(batchsize, 1, 1, 1)
         # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
-        mel_samples = audioldm.edit_audio_with_ddim(
-                            mel=mixed_mels,
-                            text=text,
-                            duration=10.24,
-                            batch_size=batchsize,
-                            transfer_strength=strength,
-                            guidance_scale=2.5,
-                            ddim_steps=steps,
-                            clipping = False,
-                            return_type="mel",
-                        )
+        
+        mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
+                    mel=mixed_mels,
+                    original_text=mixed_text,
+                    text=text,
+                    duration=10.24,
+                    batch_size=batchsize,
+                    transfer_strength=strength,
+                    guidance_scale=2.5,
+                    ddim_steps=steps,
+                    clipping = False,
+                    return_type="mel",
+                )
+
+        # mel_samples = audioldm.edit_audio_with_ddim(
+        #                     mel=mixed_mels,
+        #                     text=text,
+        #                     duration=10.24,
+        #                     batch_size=batchsize,
+        #                     transfer_strength=strength,
+        #                     guidance_scale=2.5,
+        #                     ddim_steps=steps,
+        #                     clipping = False,
+        #                     return_type="mel",
+        #                 )
             
-        batch_num = 0
-        wav_sample = processor.inverse_mel_with_phase(mel_samples[batch_num:batch_num+1], mixed_stft_c)
+        batch_sample = 0
+        wav_sample = processor.inverse_mel_with_phase(mel_samples[batch_sample:batch_sample+1], mixed_stft_c)
         wav_sample = wav_sample.squeeze()
-        sf.write(f'./test/sampling/edited_{text}_{strength:.4f}_{iter}_{batch_num}.wav', wav_sample, 16000)
+        sf.write(f'./test_null/batch_samples/edited_{text}_{strength:.4f}_{iter}_{batch_sample}.wav', wav_sample, 16000)
 
         # ------------------------------------------------------------------ #
 
         sisdrs_list = []
         sdris_list = []
-        loss_values = []
+        # loss_values = []
 
         mask = Mask(device, 1, 513, 1024)
         criterion = nn.MSELoss()
@@ -157,7 +177,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
             loss.backward()  # 역전파
             optimizer.step()  # 가중치 업데이트
 
-            loss_values.append(loss.item())  # 손실값 저장
+            # loss_values.append(loss.item())  # 손실값 저장
 
             ##
             wav_sep = processor.inverse_stft(masked_stft, mixed_stft_c)
@@ -196,25 +216,29 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         plt.xlabel('Epoch')
         plt.ylabel('sisdr')
         plt.title('sisdr Trend')
-        plt.savefig(f'./test/plot/sisdr_{text}_{iter}.png')
+        plt.savefig(f'./test_null/plot/sisdr_{text}_{iter}.png')
         plt.close()
 
         plt.plot(sdris_list)
         plt.xlabel('Epoch')
         plt.ylabel('sdri')
         plt.title('sdri Trend')
-        plt.savefig(f'./test/plot/sdri_{text}_{iter}.png')
+        plt.savefig(f'./test_null/plot/sdri_{text}_{iter}.png')
         plt.close()
 
-        wav_sep = processor.inverse_stft(masked_stft, mixed_stft_c)
-        wav_sep = wav_sep.squeeze()
-        sf.write(f'./test/sep_{text}_{iter}.wav', wav_sep, 16000)
+        iter_sisdrs.append(sisdr)
+        iter_sdris.append(sdri)
 
-        mixed_path = f'./test/sep_{text}_{iter}.wav'
+        wav_sep = processor.inverse_stft(masked_stft, mixed_stft_c)
+
+        sf.write(f'./test_null/result/sep_{text}_{iter}.wav', wav_sep, 16000)
+
+        mixed_path = f'./test_null/result/sep_{text}_{iter}.wav'
         # print(f"iteration: {iter} // sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
 
     # print(f"Final: sample: {text}\-> sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
-    return sisdrs_list, sdris_list
+    assert len(iter_sisdrs) == len(iter_sdris) == 5, (len(iter_sisdrs), len(iter_sdris))
+    return iter_sisdrs, iter_sdris
 
 
 if __name__ == "__main__":

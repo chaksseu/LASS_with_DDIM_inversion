@@ -96,7 +96,7 @@ class AudioCapsEvaluator:
         """
         self.query = query
         self.sampling_rate = sampling_rate
-        with open(f'src/evaluation/metadata/audiocaps_eval.csv') as csv_file:
+        with open(f'src/evaluation/metadata/audiocaps_eval_with_mixed_caption.csv') as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             eval_list = [row for row in csv_reader][1:]
         self.eval_list = eval_list
@@ -118,7 +118,8 @@ class AudioCapsEvaluator:
         
         for eval_data in tqdm(self.eval_list[:samples]):
 
-            idx, caption, labels, _, _ = eval_data
+            # idx, caption, labels, _, _ = eval_data
+            idx, caption, labels, _, _, mixed_caption = eval_data
 
             source_path = os.path.join(self.audio_dir, f'segment-{idx}.wav')
             mixture_path = os.path.join(self.audio_dir, f'mixture-{idx}.wav')
@@ -127,7 +128,9 @@ class AudioCapsEvaluator:
                 text = [caption]
             elif self.query == 'labels':
                 text = [labels]
-            
+            mixed_text = [mixed_caption]
+
+            config['mixed_text'] = mixed_text[0]
             config['text'] = text[0]
 
             sisdr_li, sdri_li = inference(audioldm, processor,
@@ -135,21 +138,25 @@ class AudioCapsEvaluator:
                       mixed_path=mixture_path,
                       config=config)
 
+            sisdr_li.append(caption)
+            sdri_li.append(caption)
+
             sisdrs_list.append(sisdr_li)
             sdris_list.append(sdri_li)
             
         sisdrs_array = np.array(sisdrs_list)  # (samples, iterations)
         sdris_array = np.array(sdris_list)    # (samples, iterations)
-        # print(sisdrs_array.shape, sdris_array.shape)
 
-        # 각 iteration 별 평균을 계산 (samples에 대해 평균을 구함)
-        mean_sisdr = np.mean(sisdrs_array, axis=0)  # (iterations,)
-        mean_sdri = np.mean(sdris_array, axis=0)
+        # # 각 iteration 별 평균을 계산 (samples에 대해 평균을 구함)
+        # mean_sisdr = np.mean(sisdrs_array, axis=0)  # (iterations,)
+        # mean_sdri = np.mean(sdris_array, axis=0)
 
-        # mean_sisdr = np.mean(sisdrs_list)
-        # mean_sdri = np.mean(sdris_list)
+        # # mean_sisdr = np.mean(sisdrs_list)
+        # # mean_sdri = np.mean(sdris_list)
         
-        return mean_sisdr, mean_sdri
+        # return mean_sisdr, mean_sdri
+
+        return sisdrs_array, sdris_array
 
 if __name__ == "__main__":
     def clean_wav_filenames(dir_path):
@@ -164,28 +171,49 @@ if __name__ == "__main__":
 
     eval = AudioCapsEvaluator(query='caption', sampling_rate=16000)
     
-    audioldm = ldm('cuda')
+    audioldm = ldm('cuda:1')
     device = audioldm.device
     processor = prcssr(device=device)
 
-    for i in range(4, 6):
-        config = {
-            'num_epochs': 1000,
-            'batchsize': 32,
-            'strength': 0.1*i,
-            'learning_rate': 0.01,
-            'iteration': 1,
-            'samples': 100,  # number of samples to evaluate
-            'steps': 25,  # 50 
-        }
+    # for i in range(4, 5):
+    config = {
+        'num_epochs': 300,
+        'batchsize': 32,
+        'strength': 0.6,
+        'learning_rate': 0.01,
+        'iteration': 5,
+        'samples': 100,  # number of samples to evaluate
+        'steps': 25,  # 50
+    }
 
-        mean_sisdr, mean_sdri = eval((processor, audioldm), config)
-        
-        print("========== SI-SDR  |  SDRi ===========")
-        strength_ = config['strength']
-        for epoch, (mean_sisdr, mean_sdri) in enumerate(zip(mean_sisdr, mean_sdri)):
-            if not ((epoch+1) % 100):
-                print(f">> {strength_},{epoch+1}::{mean_sisdr:.4f} / {mean_sdri:.4f}")
+    # mean_sisdr, mean_sdri = eval((processor, audioldm), config)
+    sisdr_array, sdri_array = eval((processor, audioldm), config)
+
+    def format_number(num):
+        num = float(num)  # 문자열이 아니라 숫자로 변환
+        formatted = f"{num:.4f}"
+        return formatted if num < 0 else f" {formatted}"
+
+    vec_format = np.vectorize(format_number)
+    formatted_sisdrs = vec_format(sisdr_array[:, :5].astype(float))
+    formatted_sdris = vec_format(sdri_array[:, :5].astype(float))
+
+    combined_data = np.core.defchararray.add(formatted_sisdrs, ' / ')
+    combined_data = np.core.defchararray.add(combined_data, formatted_sdris)
+
+    df = pd.DataFrame(combined_data)
+    df['caption'] = sisdr_array[:, 5].astype(str)  # caption 데이터는 sisdrs_array의 마지막 열 사용
+
+    df.columns = [f'iter {i+1}' for i in range(5)] + ['caption']
+    df.to_csv('sisdr_sdri_results_null.csv', index=False)
+    print("CSV 저장 완료: sisdr_sdri_results.csv")
+
+
+    # print("========== SI-SDR  |  SDRi ===========")
+    # strength_ = config['strength']
+    # for epoch, (mean_sisdr, mean_sdri) in enumerate(zip(mean_sisdr, mean_sdri)):
+    #     if not ((epoch+1) % 100):
+    #         print(f">> {strength_},{epoch+1}::{mean_sisdr:.4f} / {mean_sdri:.4f}")
 
 
 

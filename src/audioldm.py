@@ -395,6 +395,122 @@ class AudioLDM(nn.Module):
         return edited_waveform
 
 
+    def edit_audio_with_ddim_inversion_sampling(  # ts[B, 1, T:1024, M:64] -> mel/wav
+        self,
+        mel: torch.Tensor,
+        text: Union[str, List[str]],
+        original_text: Union[str, List[str]],
+        duration: float,
+        batch_size: int,                            #### <----
+        transfer_strength: float,
+        guidance_scale: float,
+        ddim_steps: int,
+        return_type: str = "ts",  # "ts" or "np" or "mel"
+        clipping = False,
+    ):
+        assert self.evalmode, "Let mode be eval"
+        if duration > self.audio_duration:
+            print(f"Warning: 지정한 duration {duration}s가 원본 오디오 길이 {self.audio_duration}s보다 큼")
+        # ========== mel -> latents ==========
+        assert mel.dim() == 4, mel.dim()
+        init_latent_x = self.encode_audios(mel)
+        if torch.max(torch.abs(init_latent_x)) > 1e2:
+            init_latent_x = torch.clamp(init_latent_x, min=-10.0, max=10.0)  # clipping
+        # ========== DDIM Inversion (noising) ==========
+        ori_prompt_embeds = self.encode_prompt(prompts=original_text,  batch_size=batch_size, do_cfg=True)
+        ori_uncond_embeds, ori_cond_embeds = ori_prompt_embeds.chunk(2)
+        prompt_embeds = self.encode_prompt(prompts=text,  batch_size=batch_size, do_cfg=True)
+        uncond_embeds, cond_embeds = prompt_embeds.chunk(2)
+        # ddim_inversion
+        noisy_latents = self.ddim_inversion(
+            start_latents=init_latent_x,
+            final_prompt_embeds=torch.cat([ori_uncond_embeds, ori_cond_embeds]),
+            guidance_scale=guidance_scale,
+            num_inference_steps=ddim_steps,
+            do_cfg=True,
+            transfer_strength=transfer_strength,
+        )
+        # ========== DDIM Denoising (editing) ==========
+        # ddim_denoising # ddim_sampling
+        edited_latents = self.ddim_denoising(
+            latents=noisy_latents,
+            prompt_embeds=torch.cat([uncond_embeds, cond_embeds]),
+            num_inference_steps=ddim_steps,
+            transfer_strength=transfer_strength,
+            guidance_scale=guidance_scale,
+        )
+        # ========== latent -> waveform ==========
+        # mel spectrogram 복원
+        mel_spectrogram = self.decode_latents(edited_latents)
+        # mel clipping은 선택
+        if clipping:
+            mel_spectrogram = torch.maximum(torch.minimum(mel_spectrogram, mel), mel)
+        if return_type == "mel":
+            assert mel_spectrogram.shape[-2:] == (1024,64)
+            return mel_spectrogram
+        # waveform 변환
+        edited_waveform = self.mel_to_waveform(mel_spectrogram)
+        # duration보다 긴 경우 자르기
+        expected_length = int(duration * self.vocoder.config.sampling_rate)  # 원본 samples 수
+        assert edited_waveform.ndim == 2, edited_waveform.ndim
+        edited_waveform = edited_waveform[:, :expected_length]
+        # type 결정 ("pt"인 경우에는 torch.Tensor 그대로 반환)
+        if return_type == "np":
+            edited_waveform = edited_waveform.cpu().numpy()
+        else:
+            assert return_type == "ts"
+        return edited_waveform
+
+    @torch.no_grad()
+    def ddim_inversion(
+        self,
+        start_latents,
+        final_prompt_embeds,
+        guidance_scale,
+        num_inference_steps,
+        do_cfg,
+        transfer_strength,
+    ):
+        start_timestep = int(transfer_strength * num_inference_steps)
+        latents = start_latents.clone()
+        self.scheduler.set_timesteps(num_inference_steps, device=start_latents.device)
+        # Reversed timesteps <<<<<<<<<<<<<<<<<<<<
+        timesteps = reversed(self.scheduler.timesteps)
+        for i in range(1, num_inference_steps): # range(1, num_inference_steps):
+            if i >= start_timestep: continue
+            t = timesteps[i]
+            # print(t)
+            # Expand the latents if we are doing classifier free guidance
+            latent_model_input = torch.cat([latents] * 2) if do_cfg else latents
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+            noise_pred = self.unet(
+                latent_model_input, t,
+                encoder_hidden_states=None,
+                class_labels=final_prompt_embeds,
+                cross_attention_kwargs=None,
+            ).sample
+            # Perform guidance
+            if do_cfg:
+                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+            current_t = max(0, t.item() - (1000//num_inference_steps)) # t # max(0, t.item() - (1000//num_inference_steps))
+            next_t = t # min(999, t.item() + (1000//num_inference_steps))   # t
+            alpha_t = self.scheduler.alphas_cumprod[current_t]
+            alpha_t_next = self.scheduler.alphas_cumprod[next_t]
+            # Inverted update step (re-arranging the update step to get x(t) (new latents) as a function of x(t-1) (current latents)
+            latents = (latents - (1-alpha_t).sqrt()*noise_pred)*(alpha_t_next.sqrt()/alpha_t.sqrt()) + (1-alpha_t_next).sqrt()*noise_pred
+        return latents
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     audioldm = AudioLDM(device='cpu')
     mel = torch.randn(size=(3,8,256,16))
