@@ -26,6 +26,8 @@ os.environ["HF_HOME"] = os.path.expanduser("~/.cache/huggingface")
 
 import soundfile as sf
 from src.audioldm import AudioLDM
+from src.audioldm2 import AudioLDM2
+
 from src.dataprocessor import AudioDataProcessor
 from src.sep_editing import inference
 
@@ -169,6 +171,15 @@ if __name__ == "__main__":
             elif filename.endswith(".png"):
                 file_path = os.path.join(dir_path, filename)
                 os.remove(file_path)
+    def ensure_folder_exists(folder_path):
+        os.makedirs(folder_path, exist_ok=True)
+
+    # Ensure the folders exist before calling clean_wav_filenames
+    folders = ["./test/batch_samples", "./test/plot", "./test/result"]
+
+    for folder in folders:
+        ensure_folder_exists(folder)
+
 
     clean_wav_filenames("./test/batch_samples")
     clean_wav_filenames("./test/plot")
@@ -176,15 +187,15 @@ if __name__ == "__main__":
 
     eval = AudioCapsEvaluator(query='caption', sampling_rate=16000)
     
-    audioldm = AudioLDM('cuda:1')
+    audioldm = AudioLDM2('cuda:0')
     device = audioldm.device
     processor = AudioDataProcessor(device=device)
 
     # for i in range(4, 5):
     config = {
-        'num_epochs': 300,  # 50?
+        'num_epochs': 400,  # 50?
         'batchsize': 32,
-        'strength': 0.4,  # 0.6,
+        'strength': 0.7,  # 0.6,
         'learning_rate': 0.01,
         'iteration': 5,
         'samples': 100,  # number of samples to evaluate

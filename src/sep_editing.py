@@ -14,6 +14,8 @@ import torchaudio
 import matplotlib.pyplot as plt
 import soundfile as sf
 from src.audioldm import AudioLDM
+from src.audioldm2 import AudioLDM2
+
 from dataprocessor import AudioDataProcessor
 
 def calculate_sdr(ref: np.ndarray, est: np.ndarray, eps=1e-10) -> float:
@@ -120,21 +122,34 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         mixed_stft, mixed_stft_c = processor.wav_to_stft(mixed_wav_)
         mixed_mel = processor.wav_to_mel(mixed_wav_)
 
-        mixed_mels = mixed_mel.repeat(batchsize, 1, 1, 1)
+        # 기존 배치 n으로 나눠서 for문으로 돌리는 부분 추가
+        batch_split = 4
+        batchsize_ = batchsize // batch_split
+        mixed_mels = mixed_mel.repeat(batchsize_, 1, 1, 1)
+
+        # mixed_mels = mixed_mel.repeat(batchsize, 1, 1, 1)
         # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
         # edit_audio_with_ddim
         # edit_audio_with_ddim_inversion_sampling
-        mel_samples = audioldm.edit_audio_with_ddim(
-                    mel=mixed_mels,
-                    text=text,
-                    duration=10.24,
-                    batch_size=batchsize,
-                    transfer_strength=strength,
-                    guidance_scale=2.5,
-                    ddim_steps=steps,
-                    clipping = False,
-                    return_type="mel",
-                )
+
+
+        mel_sample_list=[]
+        for i in range(batch_split):
+            mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
+                        mel=mixed_mels,
+                        original_text=mixed_text,                    
+                        text=text,
+                        duration=10.24,
+                        batch_size=batchsize_,
+                        transfer_strength=strength,
+                        guidance_scale=2.5,
+                        ddim_steps=steps,
+                        clipping = False,
+                        return_type="mel",
+                    )
+            mel_sample_list.append(mel_samples)
+        mel_samples = torch.cat(mel_sample_list, dim=0)
+
         if iter != 0:
             masked_wav = processor.read_wav_file(masked_path)
             # ------------------------------------------------------------------ #
@@ -142,22 +157,25 @@ def inference(audioldm, processor, target_path, mixed_path, config):
             masked_stft, masked_stft_c = processor.wav_to_stft(masked_wav_)
             masked_mel = processor.wav_to_mel(masked_wav_)
 
-            masked_mels = masked_mel.repeat(batchsize, 1, 1, 1)
+            masked_mels = masked_mel.repeat(batchsize_, 1, 1, 1)
             # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
             
-            mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
-                        mel=masked_mels,
-                        original_text=mixed_text,
-                        text=text,
-                        duration=10.24,
-                        batch_size=batchsize,
-                        transfer_strength=strength,
-                        guidance_scale=2.5,
-                        ddim_steps=steps,
-                        clipping = False,
-                        return_type="mel",
-                    )
-
+            masked_mel_sample_list=[]
+            for i in range(batch_split):
+                mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
+                            mel=masked_mels,
+                            original_text=mixed_text,
+                            text=text,
+                            duration=10.24,
+                            batch_size=batchsize_,
+                            transfer_strength=strength,
+                            guidance_scale=2.5,
+                            ddim_steps=steps,
+                            clipping = False,
+                            return_type="mel",
+                        )
+                masked_mel_sample_list.append(mel_samples)
+            mel_samples = torch.cat(masked_mel_sample_list, dim=0)
         '''
         mel_samples = audioldm.edit_audio_with_ddim(
                             mel=mixed_mels,
