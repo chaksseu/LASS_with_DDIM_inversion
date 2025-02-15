@@ -103,31 +103,29 @@ def inference(audioldm, processor, target_path, mixed_path, config):
     text = config['text']
     steps = config['steps']
     mixed_text = config['mixed_text']
-    mixed_text = ""
-
 
     iter_sisdrs = []
     iter_sdris = []
     
+    mask = Mask(device, 1, 513, 1024)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(mask.parameters(), lr=learning_rate)
+
     for iter in range(iteration):
         target_wav = processor.read_wav_file(target_path)
+        
         mixed_wav = processor.read_wav_file(mixed_path)
-
-        sisdr = calculate_sisdr(ref=target_wav, est=mixed_wav)
-        # print(sisdr)
-
         # ------------------------------------------------------------------ #
-
         mixed_wav_ = processor.prepare_wav(mixed_wav)
         mixed_stft, mixed_stft_c = processor.wav_to_stft(mixed_wav_)
         mixed_mel = processor.wav_to_mel(mixed_wav_)
 
         mixed_mels = mixed_mel.repeat(batchsize, 1, 1, 1)
         # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
-        
-        mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
+        # edit_audio_with_ddim
+        # edit_audio_with_ddim_inversion_sampling
+        mel_samples = audioldm.edit_audio_with_ddim(
                     mel=mixed_mels,
-                    original_text=mixed_text,
                     text=text,
                     duration=10.24,
                     batch_size=batchsize,
@@ -137,19 +135,42 @@ def inference(audioldm, processor, target_path, mixed_path, config):
                     clipping = False,
                     return_type="mel",
                 )
+        if iter != 0:
+            masked_wav = processor.read_wav_file(masked_path)
+            # ------------------------------------------------------------------ #
+            masked_wav_ = processor.prepare_wav(masked_wav)
+            masked_stft, masked_stft_c = processor.wav_to_stft(masked_wav_)
+            masked_mel = processor.wav_to_mel(masked_wav_)
 
-        # mel_samples = audioldm.edit_audio_with_ddim(
-        #                     mel=mixed_mels,
-        #                     text=text,
-        #                     duration=10.24,
-        #                     batch_size=batchsize,
-        #                     transfer_strength=strength,
-        #                     guidance_scale=2.5,
-        #                     ddim_steps=steps,
-        #                     clipping = False,
-        #                     return_type="mel",
-        #                 )
+            masked_mels = masked_mel.repeat(batchsize, 1, 1, 1)
+            # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
             
+            mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
+                        mel=masked_mels,
+                        original_text=mixed_text,
+                        text=text,
+                        duration=10.24,
+                        batch_size=batchsize,
+                        transfer_strength=strength,
+                        guidance_scale=2.5,
+                        ddim_steps=steps,
+                        clipping = False,
+                        return_type="mel",
+                    )
+
+        '''
+        mel_samples = audioldm.edit_audio_with_ddim(
+                            mel=mixed_mels,
+                            text=text,
+                            duration=10.24,
+                            batch_size=batchsize,
+                            transfer_strength=strength,
+                            guidance_scale=2.5,
+                            ddim_steps=steps,
+                            clipping = False,
+                            return_type="mel",
+                        )
+        '''
         batch_sample = 0
         wav_sample = processor.inverse_mel_with_phase(mel_samples[batch_sample:batch_sample+1], mixed_stft_c)
         wav_sample = wav_sample.squeeze()
@@ -159,11 +180,8 @@ def inference(audioldm, processor, target_path, mixed_path, config):
 
         sisdrs_list = []
         sdris_list = []
-        # loss_values = []
+        loss_values = []
 
-        mask = Mask(device, 1, 513, 1024)
-        criterion = nn.MSELoss()
-        optimizer = optim.Adam(mask.parameters(), lr=learning_rate)
         for epoch in range(num_epochs):
 
             optimizer.zero_grad()  # 그래디언트 초기화
@@ -177,7 +195,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
             loss.backward()  # 역전파
             optimizer.step()  # 가중치 업데이트
 
-            # loss_values.append(loss.item())  # 손실값 저장
+            loss_values.append(loss.item())  # 손실값 저장
 
             ##
             wav_sep = processor.inverse_stft(masked_stft, mixed_stft_c)
@@ -205,12 +223,12 @@ def inference(audioldm, processor, target_path, mixed_path, config):
                 
         # ------------------------------------------------------------------ #
 
-        # plt.plot(loss_values)
-        # plt.xlabel('Epoch')
-        # plt.ylabel('Loss')
-        # plt.title('Loss Trend')
-        # plt.savefig(f'./test/plot/loss_{text}_{iter}.png')
-        # plt.close()
+        plt.plot(loss_values)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Loss Trend')
+        plt.savefig(f'./test/plot/loss_{text}_{iter}.png')
+        plt.close()
 
         plt.plot(sisdrs_list)
         plt.xlabel('Epoch')
@@ -233,7 +251,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
 
         sf.write(f'./test/result/sep_{text}_{iter}.wav', wav_sep, 16000)
 
-        mixed_path = f'./test/result/sep_{text}_{iter}.wav'
+        masked_path = f'./test/result/sep_{text}_{iter}.wav'
         # print(f"iteration: {iter} // sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
 
     # print(f"Final: sample: {text}\-> sisdr: {sisdrs_list[-1]:.4f}, sdri: {sdris_list[-1]:.4f}")
@@ -243,20 +261,21 @@ def inference(audioldm, processor, target_path, mixed_path, config):
 
 if __name__ == "__main__":
 
-    audioldm = AudioLDM('cuda:0')
+    audioldm = AudioLDM('cuda:1')
     device = audioldm.device
     processor = AudioDataProcessor(device=device)
     target_path = './samples/A_cat_meowing.wav'
     mixed_path = './samples/a_cat_n_stepping_wood.wav'
 
     config = {
-        'text': 'A cat meowing',
-        'num_epochs': 1000,
-        'batchsize': 3,
-        'strength': 0.5,
+        'num_epochs': 50,
+        'batchsize': 16,
+        'strength': 0.6,
         'learning_rate': 0.01,
-        'iteration': 1
+        'iteration': 5,
+        'steps': 25,  # 50
+        'mixed_text': 'A cat meowing and footstep on the wooden floor',
     }
 
-    inference(audioldm, processor, target_path, mixed_path, config)
-    
+    what, iss = inference(audioldm, processor, target_path, mixed_path, config)
+    print(what, iss)

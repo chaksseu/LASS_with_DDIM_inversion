@@ -15,7 +15,6 @@ from transformers import (
     ClapTextModelWithProjection,
     RobertaTokenizerFast,
     SpeechT5HifiGan,
-    logging,
 )
 
 # Suppress partial model loading warning

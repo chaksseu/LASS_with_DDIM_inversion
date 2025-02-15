@@ -25,8 +25,8 @@ os.environ["HF_HOME"] = os.path.expanduser("~/.cache/huggingface")
 # from models.clap_encoder import CLAP_Encoder
 
 import soundfile as sf
-from src.audioldm import AudioLDM as ldm
-from src.dataprocessor import AudioDataProcessor as prcssr
+from src.audioldm import AudioLDM
+from src.dataprocessor import AudioDataProcessor
 from src.sep_editing import inference
 
 import torchaudio
@@ -166,20 +166,25 @@ if __name__ == "__main__":
             if filename.endswith(".wav"):
                 file_path = os.path.join(dir_path, filename)
                 os.remove(file_path)
+            elif filename.endswith(".png"):
+                file_path = os.path.join(dir_path, filename)
+                os.remove(file_path)
 
-    clean_wav_filenames("./result")
+    clean_wav_filenames("./test/batch_samples")
+    clean_wav_filenames("./test/plot")
+    clean_wav_filenames("./test/result")
 
     eval = AudioCapsEvaluator(query='caption', sampling_rate=16000)
     
-    audioldm = ldm('cuda:1')
+    audioldm = AudioLDM('cuda:1')
     device = audioldm.device
-    processor = prcssr(device=device)
+    processor = AudioDataProcessor(device=device)
 
     # for i in range(4, 5):
     config = {
-        'num_epochs': 300,
+        'num_epochs': 300,  # 50?
         'batchsize': 32,
-        'strength': 0.6,
+        'strength': 0.4,  # 0.6,
         'learning_rate': 0.01,
         'iteration': 5,
         'samples': 100,  # number of samples to evaluate
@@ -251,3 +256,24 @@ if __name__ == "__main__":
     #         './test/noised.wav',]
 
     # plot_wav_mel(wavs)
+
+
+    # audioldm = AudioLDM('cuda:1')
+    # device = audioldm.device
+    # processor = AudioDataProcessor(device=device)
+    # target_path = './samples/A_cat_meowing.wav'
+    # mixed_path = './samples/a_cat_n_stepping_wood.wav'
+
+    # config = {
+    #     'num_epochs': 50,
+    #     'batchsize': 1,
+    #     'strength': 0.6,
+    #     'learning_rate': 0.01,
+    #     'iteration': 5,
+    #     'steps': 25,  # 50
+    #     'text': ['A cat meowing'],
+    #     'mixed_text': ['A cat meowing and footstep on the wooden floor'],
+    # }
+
+    # what, iss = inference(audioldm, processor, target_path, mixed_path, config)
+    # print(what, iss)

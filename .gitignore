@@ -30,3 +30,4 @@ AudioSep Eval Benchmark
 *.zip
 *.png
 test
+.log
