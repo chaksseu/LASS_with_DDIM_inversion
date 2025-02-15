@@ -14,6 +14,8 @@ import torchaudio
 import matplotlib.pyplot as plt
 import soundfile as sf
 from src.audioldm import AudioLDM
+from src.audioldm2 import AudioLDM2
+
 from dataprocessor import AudioDataProcessor
 
 def calculate_sdr(ref: np.ndarray, est: np.ndarray, eps=1e-10) -> float:
