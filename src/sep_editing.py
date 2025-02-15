@@ -113,41 +113,38 @@ def inference(audioldm, processor, target_path, mixed_path, config):
 
     for iter in range(iteration):
         target_wav = processor.read_wav_file(target_path)
-        
         mixed_wav = processor.read_wav_file(mixed_path)
-        # ------------------------------------------------------------------ #
+
         mixed_wav_ = processor.prepare_wav(mixed_wav)
         mixed_stft, mixed_stft_c = processor.wav_to_stft(mixed_wav_)
         mixed_mel = processor.wav_to_mel(mixed_wav_)
-
         mixed_mels = mixed_mel.repeat(batchsize, 1, 1, 1)
-        # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
-        # edit_audio_with_ddim
-        # edit_audio_with_ddim_inversion_sampling
-        mel_samples = audioldm.edit_audio_with_ddim(
-                    mel=mixed_mels,
-                    text=text,
-                    duration=10.24,
-                    batch_size=batchsize,
-                    transfer_strength=strength,
-                    guidance_scale=2.5,
-                    ddim_steps=steps,
-                    clipping = False,
-                    return_type="mel",
-                )
+        ref_mels = mixed_mels
+        
         if iter != 0:
             masked_wav = processor.read_wav_file(masked_path)
-            # ------------------------------------------------------------------ #
             masked_wav_ = processor.prepare_wav(masked_wav)
             masked_stft, masked_stft_c = processor.wav_to_stft(masked_wav_)
             masked_mel = processor.wav_to_mel(masked_wav_)
-
             masked_mels = masked_mel.repeat(batchsize, 1, 1, 1)
-            # for batch in tqdm(range(batchsize), bar_format="{n}", disable=False):
-            
+            ref_mels = masked_mels
+
+        if iter == 0:
             mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
-                        mel=masked_mels,
+                        mel=ref_mels,
+                        text=text,
                         original_text=mixed_text,
+                        duration=10.24,
+                        batch_size=batchsize,
+                        transfer_strength=strength,
+                        guidance_scale=2.5,
+                        ddim_steps=steps,
+                        clipping = False,
+                        return_type="mel",
+                    )
+        elif iter != 0:
+            mel_samples = audioldm.edit_audio_with_ddim(
+                        mel=ref_mels,
                         text=text,
                         duration=10.24,
                         batch_size=batchsize,
