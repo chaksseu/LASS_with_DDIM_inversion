@@ -16,18 +16,11 @@ untracked
 .ipynb_checkpoints
 .virtual_documents
 
-peekaboo_results
-
-thumbnails
-
-best_samples
-samples
-*.wav
-
-data
-result
 AudioSep Eval Benchmark
+samples
+data/*
+*.wav
 *.zip
 *.png
-test
-.log
+*.log
+sisdr_sdri_results*
