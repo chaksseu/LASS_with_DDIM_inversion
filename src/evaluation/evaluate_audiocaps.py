@@ -187,7 +187,7 @@ if __name__ == "__main__":
 
     eval = AudioCapsEvaluator(query='caption', sampling_rate=16000)
     
-    audioldm = AudioLDM2('cuda:0')
+    audioldm = AudioLDM('cuda:0')
     device = audioldm.device
     processor = AudioDataProcessor(device=device)
 

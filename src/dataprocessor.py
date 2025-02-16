@@ -146,7 +146,7 @@ class AudioDataProcessor():
         stft_mag = torch.abs(stft_complex)  # ts[1, F:513, T:1024~30]
         stft_mag, stft_complex = stft_mag[:,:,:self.target_length], stft_complex[:,:,:self.target_length]  # ts[F,T], ts[F,T]
         assert stft_complex.shape == stft_mag.shape
-        assert stft_mag.shape == (1,self.n_freq,self.n_times), f"{stft_mag.shape}, {self.n_freq}, {self.n_times}"
+        assert stft_mag.shape[:2] == (1,self.n_freq), f"{stft_mag.shape}, {self.n_freq}, {self.n_times}"
         return stft_mag, stft_complex  # [1, F:513, T:1024], [1, F:513, T:1024]
     
     def spectral_normalize_torch(self, magnitudes, C=1, CLIP_VAL=1e-5):  # dynamic_range_compression

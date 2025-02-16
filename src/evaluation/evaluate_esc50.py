@@ -20,6 +20,7 @@ os.environ["HF_HOME"] = os.path.expanduser("~/.cache/huggingface")
 
 import soundfile as sf
 from src.audioldm import AudioLDM
+from src.audioldm2 import AudioLDM2
 from src.dataprocessor import AudioDataProcessor as prcssr
 from src.sep_editing import inference
 
@@ -117,7 +118,7 @@ class ESC50Evaluator:
 
             source_path = os.path.join(self.audio_dir, f'segment-{idx}.wav')
             mixture_path = os.path.join(self.audio_dir, f'mixture-{idx}.wav')
-                            
+
             text = [caption]
             mixed_text = [mixed_caption]
 
@@ -163,30 +164,20 @@ if __name__ == "__main__":
     eval = ESC50Evaluator(sampling_rate=16000)
     
     modelconfig = {
-        'duration': 5.12,
+        'duration': 10.24,
     }
     audioldm = AudioLDM('cuda', config=modelconfig)
     device = audioldm.device
     processor = prcssr(device=device, config=modelconfig)
 
-    # config = {
-    #     'num_epochs': 300,
-    #     'batchsize': 32,
-    #     'strength': 0.6,
-    #     'learning_rate': 0.01,
-    #     'iteration': 3,
-    #     'samples': 100,  # number of samples to evaluate
-    #     'steps': 20,  # 50
-    # }
-
     config = {
         'num_epochs': 200,
         'batchsize': 32,
-        'strength': 0.6,
+        'strength': 0.4,
         'learning_rate': 0.01,
         'iteration': 3,
-        'samples': 2,  # number of samples to evaluate
-        'steps': 15,  # 50
+        'samples': 100,  # number of samples to evaluate
+        'steps': 20,  # 50
     }
 
     # mean_sisdr, mean_sdri = eval((processor, audioldm), config)

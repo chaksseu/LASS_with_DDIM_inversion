@@ -114,8 +114,13 @@ def inference(audioldm, processor, target_path, mixed_path, config):
     optimizer = optim.Adam(mask.parameters(), lr=learning_rate)
 
     for iter in range(iteration):
+        processor.duration = 5.12
         target_wav = processor.read_wav_file(target_path)
         mixed_wav = processor.read_wav_file(mixed_path)
+        target_wav = np.concatenate([target_wav, target_wav], axis=1)
+        mixed_wav = np.concatenate([mixed_wav, mixed_wav], axis=1)
+        assert mixed_wav.ndim == 2 and mixed_wav.shape[1] == 163840, mixed_wav.shape
+
 
         mixed_wav_ = processor.prepare_wav(mixed_wav)
         mixed_stft, mixed_stft_c = processor.wav_to_stft(mixed_wav_)
@@ -138,9 +143,10 @@ def inference(audioldm, processor, target_path, mixed_path, config):
         if iter == 0:
             mel_sample_list=[]
             for i in range(batch_split):
-                mel_samples = audioldm.edit_audio_with_ddim_inversion_sampling(
+                # edit_audio_with_ddim_inversion_sampling
+                mel_samples = audioldm.edit_audio_with_ddim(
                             mel=ref_mels,
-                            original_text=mixed_text,
+                            # original_text=mixed_text,
                             text=text,
                             duration=10.24,
                             batch_size=batchsize_,
@@ -157,9 +163,10 @@ def inference(audioldm, processor, target_path, mixed_path, config):
             for i in range(batch_split):
                 mel_samples = audioldm.edit_audio_with_ddim(
                             mel=ref_mels,
+                            # original_text=mixed_text,
                             text=text,
                             duration=10.24,
-                            batch_size=batchsize,
+                            batch_size=batchsize_,
                             transfer_strength=strength,
                             guidance_scale=2.5,
                             ddim_steps=steps,
@@ -169,19 +176,7 @@ def inference(audioldm, processor, target_path, mixed_path, config):
                 mel_sample_list.append(mel_samples)
         mel_samples = torch.cat(mel_sample_list, dim=0)
         assert mel_samples.size(0) == batchsize and mel_samples.dim() == 4, (mel_samples.shape, batchsize)
-        '''
-        mel_samples = audioldm.edit_audio_with_ddim(
-                            mel=mixed_mels,
-                            text=text,
-                            duration=10.24,
-                            batch_size=batchsize,
-                            transfer_strength=strength,
-                            guidance_scale=2.5,
-                            ddim_steps=steps,
-                            clipping = False,
-                            return_type="mel",
-                        )
-        '''
+
         batch_sample = 0
         wav_sample = processor.inverse_mel_with_phase(mel_samples[batch_sample:batch_sample+1], mixed_stft_c)
         wav_sample = wav_sample.squeeze()
@@ -285,6 +280,7 @@ if __name__ == "__main__":
         'learning_rate': 0.01,
         'iteration': 5,
         'steps': 25,  # 50
+        'text': 'A cat meowing',
         'mixed_text': 'A cat meowing and footstep on the wooden floor',
     }
 
